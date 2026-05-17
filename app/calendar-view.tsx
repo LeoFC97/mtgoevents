@@ -143,14 +143,15 @@ export default function CalendarView({ events }: { events: MtgoEvent[] }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => setWeekOffset(weekOffset - 1)}
+            aria-label="Previous week"
             className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm hover:bg-zinc-800"
           >
-            ← Prev
+            ← <span className="hidden sm:inline">Prev</span>
           </button>
           <button
             type="button"
@@ -162,12 +163,13 @@ export default function CalendarView({ events }: { events: MtgoEvent[] }) {
           <button
             type="button"
             onClick={() => setWeekOffset(weekOffset + 1)}
+            aria-label="Next week"
             className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm hover:bg-zinc-800"
           >
-            Next →
+            <span className="hidden sm:inline">Next</span> →
           </button>
         </div>
-        <div className="text-lg font-medium">{rangeLabel}</div>
+        <div className="text-base font-medium sm:text-lg">{rangeLabel}</div>
         <TimezonePicker
           tz={tz}
           autoTz={autoTz}
@@ -195,7 +197,7 @@ export default function CalendarView({ events }: { events: MtgoEvent[] }) {
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-7">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7">
         {dayKeys.map((key, i) => {
           const isToday = key === todayKey;
           return (
@@ -208,11 +210,13 @@ export default function CalendarView({ events }: { events: MtgoEvent[] }) {
               }`}
             >
               <div className="border-b border-zinc-800 px-3 py-2">
-                <div className="text-xs uppercase tracking-wide text-zinc-400">
-                  {DAY_NAMES[dowOfKey(key)]}
-                </div>
-                <div className="text-sm font-medium">
-                  {formatDayLabel(key, { month: "short", day: "numeric" })}
+                <div className="flex items-baseline justify-between gap-2 xl:block">
+                  <div className="text-xs uppercase tracking-wide text-zinc-400">
+                    {DAY_NAMES[dowOfKey(key)]}
+                  </div>
+                  <div className="text-sm font-medium">
+                    {formatDayLabel(key, { month: "short", day: "numeric" })}
+                  </div>
                 </div>
               </div>
               <div className="flex flex-col gap-2 p-2">
@@ -245,12 +249,12 @@ function TimezonePicker({
 }) {
   const isAuto = tz === autoTz;
   return (
-    <div className="ml-auto flex items-center gap-2">
+    <div className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto">
       <label className="text-xs text-zinc-400">Timezone</label>
       <select
         value={tz}
         onChange={(e) => onChange(e.target.value)}
-        className="max-w-[16rem] rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200 hover:border-zinc-500"
+        className="min-w-0 flex-1 rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200 hover:border-zinc-500 sm:flex-none sm:max-w-[16rem]"
       >
         {allTimezones.map((zone) => (
           <option key={zone} value={zone}>
@@ -262,7 +266,7 @@ function TimezonePicker({
         <button
           type="button"
           onClick={() => onChange(autoTz)}
-          className="text-xs text-zinc-400 underline-offset-2 hover:underline"
+          className="shrink-0 text-xs text-zinc-400 underline-offset-2 hover:underline"
           title={`Reset to browser timezone (${autoTz})`}
         >
           auto
@@ -287,7 +291,7 @@ function FilterRow<T extends string>({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="w-16 text-xs uppercase tracking-wide text-zinc-400">
+      <span className="min-w-14 text-xs uppercase tracking-wide text-zinc-400">
         {label}
       </span>
       {items.map((item) => {
