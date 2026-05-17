@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   bucketOf,
   googleCalendarUrl,
@@ -23,38 +23,84 @@ const FORMAT_COLORS: Record<string, string> = {
   "Phantom Sealed": "bg-teal-500/15 text-teal-300 border-teal-500/40",
 };
 
+const DEFAULT_TZ = "UTC";
+const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
 function defaultFormatColor(): string {
   return "bg-zinc-500/15 text-zinc-300 border-zinc-500/40";
 }
 
-function startOfWeek(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  const day = d.getDay();
-  d.setDate(d.getDate() - day);
-  return d;
+function dayKeyInTz(iso: string | Date, tz: string): string {
+  const date = iso instanceof Date ? iso : new Date(iso);
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
 }
 
-function addDays(date: Date, n: number): Date {
-  const d = new Date(date);
-  d.setDate(d.getDate() + n);
-  return d;
+function addDaysKey(key: string, n: number): string {
+  const [y, m, d] = key.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d, 12));
+  dt.setUTCDate(dt.getUTCDate() + n);
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(dt.getUTCDate()).padStart(2, "0")}`;
 }
 
-function sameDay(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
+function dowOfKey(key: string): number {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d, 12)).getUTCDay();
 }
 
-const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+function startOfWeekKey(key: string): string {
+  return addDaysKey(key, -dowOfKey(key));
+}
+
+function formatDayLabel(key: string, opts: Intl.DateTimeFormatOptions): string {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString("en-US", {
+    ...opts,
+    timeZone: "UTC",
+  });
+}
+
+function getAllTimezones(): string[] {
+  type IntlWithTz = typeof Intl & {
+    supportedValuesOf?: (key: "timeZone") => string[];
+  };
+  const intl = Intl as IntlWithTz;
+  if (typeof intl.supportedValuesOf === "function") {
+    return intl.supportedValuesOf("timeZone");
+  }
+  return ["UTC"];
+}
 
 export default function CalendarView({ events }: { events: MtgoEvent[] }) {
-  const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date()));
+  const [tz, setTz] = useState<string>(DEFAULT_TZ);
+  const [autoTz, setAutoTz] = useState<string>(DEFAULT_TZ);
+  const [weekOffset, setWeekOffset] = useState<number>(0);
   const [formatFilter, setFormatFilter] = useState<Set<string>>(new Set());
   const [typeFilter, setTypeFilter] = useState<Set<TypeBucket>>(new Set());
+
+  useEffect(() => {
+    const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    setAutoTz(browserTz);
+    setTz(browserTz);
+  }, []);
+
+  const allTimezones = useMemo(() => getAllTimezones(), []);
+
+  const todayKey = useMemo(() => dayKeyInTz(new Date(), tz), [tz]);
+
+  const weekStartKey = useMemo(
+    () => addDaysKey(startOfWeekKey(todayKey), weekOffset * 7),
+    [todayKey, weekOffset]
+  );
+
+  const dayKeys = useMemo(
+    () => Array.from({ length: 7 }, (_, i) => addDaysKey(weekStartKey, i)),
+    [weekStartKey]
+  );
 
   const availableFormats = useMemo(() => {
     const present = new Set(events.map((e) => e.format));
@@ -69,15 +115,15 @@ export default function CalendarView({ events }: { events: MtgoEvent[] }) {
     });
   }, [events, formatFilter, typeFilter]);
 
-  const days = useMemo(() => {
-    return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-  }, [weekStart]);
-
   const byDay = useMemo(() => {
-    return days.map((day) =>
-      filtered.filter((e) => sameDay(new Date(e.startUtc), day))
-    );
-  }, [days, filtered]);
+    const buckets: Record<string, MtgoEvent[]> = {};
+    for (const key of dayKeys) buckets[key] = [];
+    for (const ev of filtered) {
+      const key = dayKeyInTz(ev.startUtc, tz);
+      if (buckets[key]) buckets[key].push(ev);
+    }
+    return dayKeys.map((k) => buckets[k]);
+  }, [dayKeys, filtered, tz]);
 
   const toggle = <T,>(set: Set<T>, value: T, setter: (next: Set<T>) => void) => {
     const next = new Set(set);
@@ -86,15 +132,10 @@ export default function CalendarView({ events }: { events: MtgoEvent[] }) {
     setter(next);
   };
 
-  const tz =
-    typeof Intl !== "undefined"
-      ? Intl.DateTimeFormat().resolvedOptions().timeZone
-      : "local";
-
-  const rangeLabel = `${days[0].toLocaleDateString(undefined, {
+  const rangeLabel = `${formatDayLabel(dayKeys[0], {
     month: "short",
     day: "numeric",
-  })} – ${days[6].toLocaleDateString(undefined, {
+  })} – ${formatDayLabel(dayKeys[6], {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -106,28 +147,33 @@ export default function CalendarView({ events }: { events: MtgoEvent[] }) {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => setWeekStart(addDays(weekStart, -7))}
+            onClick={() => setWeekOffset(weekOffset - 1)}
             className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm hover:bg-zinc-800"
           >
             ← Prev
           </button>
           <button
             type="button"
-            onClick={() => setWeekStart(startOfWeek(new Date()))}
+            onClick={() => setWeekOffset(0)}
             className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm hover:bg-zinc-800"
           >
             Today
           </button>
           <button
             type="button"
-            onClick={() => setWeekStart(addDays(weekStart, 7))}
+            onClick={() => setWeekOffset(weekOffset + 1)}
             className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm hover:bg-zinc-800"
           >
             Next →
           </button>
         </div>
         <div className="text-lg font-medium">{rangeLabel}</div>
-        <div className="ml-auto text-xs text-zinc-400">Timezone: {tz}</div>
+        <TimezonePicker
+          tz={tz}
+          autoTz={autoTz}
+          allTimezones={allTimezones}
+          onChange={setTz}
+        />
       </div>
 
       <div className="flex flex-col gap-3">
@@ -150,11 +196,11 @@ export default function CalendarView({ events }: { events: MtgoEvent[] }) {
       </div>
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-7">
-        {days.map((day, i) => {
-          const isToday = sameDay(day, new Date());
+        {dayKeys.map((key, i) => {
+          const isToday = key === todayKey;
           return (
             <div
-              key={day.toISOString()}
+              key={key}
               className={`flex min-h-32 flex-col rounded-lg border ${
                 isToday
                   ? "border-emerald-500/50 bg-emerald-500/5"
@@ -163,26 +209,65 @@ export default function CalendarView({ events }: { events: MtgoEvent[] }) {
             >
               <div className="border-b border-zinc-800 px-3 py-2">
                 <div className="text-xs uppercase tracking-wide text-zinc-400">
-                  {DAY_NAMES[day.getDay()]}
+                  {DAY_NAMES[dowOfKey(key)]}
                 </div>
                 <div className="text-sm font-medium">
-                  {day.toLocaleDateString(undefined, {
-                    month: "short",
-                    day: "numeric",
-                  })}
+                  {formatDayLabel(key, { month: "short", day: "numeric" })}
                 </div>
               </div>
               <div className="flex flex-col gap-2 p-2">
                 {byDay[i].length === 0 ? (
                   <div className="px-1 py-2 text-xs text-zinc-500">No events</div>
                 ) : (
-                  byDay[i].map((ev) => <EventCard key={ev.uid} event={ev} />)
+                  byDay[i].map((ev) => (
+                    <EventCard key={ev.uid} event={ev} tz={tz} />
+                  ))
                 )}
               </div>
             </div>
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function TimezonePicker({
+  tz,
+  autoTz,
+  allTimezones,
+  onChange,
+}: {
+  tz: string;
+  autoTz: string;
+  allTimezones: string[];
+  onChange: (tz: string) => void;
+}) {
+  const isAuto = tz === autoTz;
+  return (
+    <div className="ml-auto flex items-center gap-2">
+      <label className="text-xs text-zinc-400">Timezone</label>
+      <select
+        value={tz}
+        onChange={(e) => onChange(e.target.value)}
+        className="max-w-[16rem] rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200 hover:border-zinc-500"
+      >
+        {allTimezones.map((zone) => (
+          <option key={zone} value={zone}>
+            {zone}
+          </option>
+        ))}
+      </select>
+      {!isAuto && (
+        <button
+          type="button"
+          onClick={() => onChange(autoTz)}
+          className="text-xs text-zinc-400 underline-offset-2 hover:underline"
+          title={`Reset to browser timezone (${autoTz})`}
+        >
+          auto
+        </button>
+      )}
     </div>
   );
 }
@@ -235,10 +320,13 @@ function FilterRow<T extends string>({
   );
 }
 
-function EventCard({ event }: { event: MtgoEvent }) {
+function EventCard({ event, tz }: { event: MtgoEvent; tz: string }) {
   const start = new Date(event.startUtc);
-  const fmtTime = (d: Date) =>
-    d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  const timeLabel = start.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: tz,
+  });
   const formatClass = FORMAT_COLORS[event.format] ?? defaultFormatColor();
 
   return (
@@ -250,7 +338,7 @@ function EventCard({ event }: { event: MtgoEvent }) {
           {event.format}
         </span>
         <span className="text-[11px] tabular-nums text-zinc-400">
-          {fmtTime(start)}
+          {timeLabel}
         </span>
       </div>
       <div className="text-sm leading-snug">{event.type}</div>
