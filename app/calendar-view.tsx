@@ -134,7 +134,9 @@ export default function CalendarView({ events }: { events: MtgoEvent[] }) {
   }, [events]);
 
   const filtered = useMemo(() => {
+    const now = Date.now();
     return events.filter((ev) => {
+      if (new Date(ev.endUtc).getTime() < now) return false;
       if (formatFilter.size && !formatFilter.has(ev.format)) return false;
       if (typeFilter.size && !typeFilter.has(bucketOf(ev.type))) return false;
       return true;
@@ -252,12 +254,7 @@ export default function CalendarView({ events }: { events: MtgoEvent[] }) {
                   <div className="px-1 py-2 text-xs text-zinc-500">No events</div>
                 ) : (
                   byDay[i].map((ev) => (
-                    <EventCard
-                      key={ev.uid}
-                      event={ev}
-                      tz={tz}
-                      isPast={new Date(ev.endUtc) < new Date()}
-                    />
+                    <EventCard key={ev.uid} event={ev} tz={tz} />
                   ))
                 )}
               </div>
@@ -357,15 +354,7 @@ function FilterRow<T extends string>({
   );
 }
 
-function EventCard({
-  event,
-  tz,
-  isPast,
-}: {
-  event: MtgoEvent;
-  tz: string;
-  isPast: boolean;
-}) {
+function EventCard({ event, tz }: { event: MtgoEvent; tz: string }) {
   const start = new Date(event.startUtc);
   const timeLabel = start.toLocaleTimeString(undefined, {
     hour: "2-digit",
@@ -375,11 +364,7 @@ function EventCard({
   const formatClass = FORMAT_COLORS[event.format] ?? defaultFormatColor();
 
   return (
-    <div
-      className={`flex flex-col gap-1 rounded-md border border-zinc-800 bg-zinc-950/60 p-2 hover:border-zinc-700 ${
-        isPast ? "opacity-50" : ""
-      }`}
-    >
+    <div className="flex flex-col gap-1 rounded-md border border-zinc-800 bg-zinc-950/60 p-2 hover:border-zinc-700">
       <div className="flex items-center gap-2">
         <span
           className={`rounded-sm border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${formatClass}`}
@@ -391,20 +376,14 @@ function EventCard({
         </span>
       </div>
       <div className="text-sm leading-snug">{event.type}</div>
-      {isPast ? (
-        <div className="mt-1 text-center text-[11px] text-zinc-500">
-          Ended
-        </div>
-      ) : (
-        <a
-          href={googleCalendarUrl(event)}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-1 inline-flex items-center justify-center gap-1 rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200 hover:border-emerald-500 hover:text-emerald-300"
-        >
-          + Google Calendar
-        </a>
-      )}
+      <a
+        href={googleCalendarUrl(event)}
+        target="_blank"
+        rel="noreferrer"
+        className="mt-1 inline-flex items-center justify-center gap-1 rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200 hover:border-emerald-500 hover:text-emerald-300"
+      >
+        + Google Calendar
+      </a>
     </div>
   );
 }
