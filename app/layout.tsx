@@ -5,7 +5,7 @@ import "./globals.css";
 
 const adsenseClient = process.env.NEXT_PUBLIC_ADSENSE_CLIENT;
 const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://mtgoevents.vercel.app";
+  process.env.NEXT_PUBLIC_SITE_URL?.trim() ?? "https://mtgoevents.vercel.app";
 const description =
   "Weekly calendar of Magic Online scheduled events. Subscribe by .ics or add any event to Google Calendar in one click.";
 
