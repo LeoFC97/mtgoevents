@@ -4,6 +4,10 @@ import Script from "next/script";
 import "./globals.css";
 
 const adsenseClient = process.env.NEXT_PUBLIC_ADSENSE_CLIENT;
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://mtgoevents.vercel.app";
+const description =
+  "Weekly calendar of Magic Online scheduled events. Subscribe by .ics or add any event to Google Calendar in one click.";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,9 +20,39 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MTGO Events",
-  description:
-    "Weekly calendar of Magic Online scheduled events with one-click Google Calendar export.",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "MTGO Events — Magic Online weekly schedule",
+    template: "%s — MTGO Events",
+  },
+  description,
+  applicationName: "MTGO Events",
+  keywords: [
+    "MTGO",
+    "Magic Online",
+    "Magic the Gathering",
+    "MTG schedule",
+    "MTGO calendar",
+    "Modern",
+    "Legacy",
+    "Pauper",
+    "Standard",
+    "Challenge",
+    "Qualifier",
+  ],
+  openGraph: {
+    type: "website",
+    url: siteUrl,
+    siteName: "MTGO Events",
+    title: "MTGO Events — Magic Online weekly schedule",
+    description,
+  },
+  twitter: {
+    card: "summary",
+    title: "MTGO Events — Magic Online weekly schedule",
+    description,
+  },
+  robots: { index: true, follow: true },
 };
 
 export default function RootLayout({
