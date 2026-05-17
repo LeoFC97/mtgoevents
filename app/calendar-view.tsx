@@ -237,7 +237,6 @@ function FilterRow<T extends string>({
 
 function EventCard({ event }: { event: MtgoEvent }) {
   const start = new Date(event.startUtc);
-  const end = new Date(event.endUtc);
   const fmtTime = (d: Date) =>
     d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
   const formatClass = FORMAT_COLORS[event.format] ?? defaultFormatColor();
@@ -251,7 +250,7 @@ function EventCard({ event }: { event: MtgoEvent }) {
           {event.format}
         </span>
         <span className="text-[11px] tabular-nums text-zinc-400">
-          {fmtTime(start)}–{fmtTime(end)}
+          {fmtTime(start)}
         </span>
       </div>
       <div className="text-sm leading-snug">{event.type}</div>
