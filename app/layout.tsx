@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 const adsenseClient = process.env.NEXT_PUBLIC_ADSENSE_CLIENT;
@@ -75,6 +76,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col bg-zinc-950 text-zinc-100">
         {children}
+        <Analytics />
       </body>
     </html>
   );
