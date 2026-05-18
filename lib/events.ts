@@ -128,3 +128,69 @@ export function googleCalendarUrl(event: MtgoEvent): string {
   });
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
+
+export function formatToSlug(format: string): string {
+  return format.toLowerCase().replace(/\s+/g, "-");
+}
+
+export function slugToFormat(slug: string): string | null {
+  const found = KNOWN_FORMATS.find((f) => formatToSlug(f) === slug);
+  return found ?? null;
+}
+
+export const FORMAT_DESCRIPTIONS: Record<string, string> = {
+  Modern:
+    "Modern is a competitive non-rotating constructed format using cards from Eighth Edition forward. On Magic Online, Modern Challenges run multiple times per week and feed the Regional Championship Qualifier circuit. Modern Super Qualifiers offer direct paths to live events and Pro Tour invitations. The metagame ranges from linear aggressive decks like Burn and Hammer Time to interactive control and combo strategies.",
+  Pauper:
+    "Pauper is a constructed format where only cards printed at common rarity in any Magic set are legal. On Magic Online, Pauper Challenges and Qualifiers run weekly, with the Pauper Format Panel maintaining the banlist. The format rewards efficient interaction, tribal aggressive shells, and brewer creativity — popular archetypes include Mono-Black Control, Affinity, Faeries, and Burn.",
+  Legacy:
+    "Legacy on Magic Online is the highest-power constructed format with virtually no rotation. Weekly Legacy Challenges and occasional Super Qualifiers draw a dedicated grinder community. Tier-one decks like Reanimator, Delver variants, and Show and Tell define the metagame, with Force of Will and Wasteland acting as format pillars.",
+  Standard:
+    "Standard is the rotating constructed format featuring cards from the most recent Magic sets. On Magic Online, Standard Challenges run frequently with Showcase Challenge and Super Qualifier paths available throughout the season. The format rewards adapting quickly to new releases and reading the metagame as fresh cards reshape the top tables.",
+  Pioneer:
+    "Pioneer is a non-rotating format that includes cards from Return to Ravnica forward. MTGO hosts weekly Pioneer Challenges with Showcase and Qualifier structures attached. Pioneer often serves as a bridge between Standard and Modern, with decks like Mono-Green Devotion, Rakdos Vampires, and Phoenix populating the upper tables.",
+  Vintage:
+    "Vintage is the broadest constructed format on Magic Online, allowing nearly every card ever printed with a small restricted list capping certain cards to one copy. Vintage Challenges run weekly and showcase iconic Power Nine and Bazaar of Baghdad strategies alongside modern designs.",
+  Limited:
+    "Limited events on Magic Online include Sealed Deck and Booster Draft formats. Phantom Sealed events use virtual packs with no card ownership, ideal for low-cost set practice. Limited Challenges, Showcase Limited events, and Super Qualifiers feature the latest set and Cube Drafts rotate through curated lists.",
+  Premodern:
+    "Premodern is a fan-supported eternal format using cards printed from Fourth Edition through Scourge. On Magic Online, Premodern Challenges and Championship Week events run on a regular cadence and capture the texture of early-2000s Magic.",
+  "Duel Commander":
+    "Duel Commander is the 1v1 variant of the Commander format with its own banlist tuned for two-player play. MTGO runs scheduled Duel Commander Trials and other events on a regular cadence.",
+  "Phantom Sealed":
+    "Phantom Sealed events on Magic Online use virtual booster packs that do not transfer card ownership — the cards exist only for the duration of the event, making them ideal for low-cost set practice ahead of paper events.",
+  Commander:
+    "Commander is the 100-card multiplayer format built around a legendary creature commander. Scheduled Commander events appear on Magic Online from time to time.",
+  Cube:
+    "Cube events on Magic Online use a curated card list assembled by the cube designer, drafted by participants. Cube format and frequency varies by event.",
+};
+
+export function eventStructuredData(
+  event: MtgoEvent,
+  siteUrl: string
+): Record<string, unknown> {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Event",
+    name: event.summary,
+    startDate: event.startUtc,
+    endDate: event.endUtc,
+    eventStatus: "https://schema.org/EventScheduled",
+    eventAttendanceMode: "https://schema.org/OnlineEventAttendanceMode",
+    location: {
+      "@type": "VirtualLocation",
+      url: "https://www.mtgo.com/",
+    },
+    organizer: {
+      "@type": "Organization",
+      name: "Daybreak Games",
+      url: "https://www.mtgo.com/",
+    },
+    url: `${siteUrl}/event/${event.uid}`,
+  };
+}
+
+export async function findEvent(uid: string): Promise<MtgoEvent | null> {
+  const events = await fetchEvents();
+  return events.find((e) => e.uid === uid) ?? null;
+}
