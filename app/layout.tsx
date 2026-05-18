@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
@@ -46,13 +46,23 @@ export const metadata: Metadata = {
     siteName: "MTGO Events",
     title: "MTGO Events — Magic Online weekly schedule",
     description,
+    locale: "en_US",
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "MTGO Events — Magic Online weekly schedule",
     description,
   },
-  robots: { index: true, follow: true },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, "max-snippet": -1, "max-image-preview": "large" },
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#10b981",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({

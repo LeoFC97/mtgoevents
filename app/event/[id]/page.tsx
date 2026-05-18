@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import SiteFooter from "@/components/site-footer";
 import {
+  breadcrumbStructuredData,
   bucketOf,
   eventStructuredData,
   fetchEvents,
@@ -83,6 +85,14 @@ export default async function EventPage({
   if (!event) notFound();
 
   const schema = eventStructuredData(event, siteUrl);
+  const breadcrumbSchema = breadcrumbStructuredData([
+    { name: "MTGO Events", url: siteUrl },
+    {
+      name: event.format,
+      url: `${siteUrl}/format/${formatToSlug(event.format)}`,
+    },
+    { name: event.summary },
+  ]);
   const isPast = new Date(event.endUtc).getTime() < Date.now();
 
   return (
@@ -121,9 +131,9 @@ export default async function EventPage({
 
       <section className="flex flex-col gap-2 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
         <div className="text-sm text-zinc-400">When</div>
-        <div className="text-base text-zinc-100">
+        <time dateTime={event.startUtc} className="text-base text-zinc-100">
           {formatDateLong(event.startUtc)}
-        </div>
+        </time>
         <div className="text-sm tabular-nums text-zinc-300">
           Starts at {formatTime(event.startUtc)} UTC
         </div>
@@ -158,20 +168,15 @@ export default async function EventPage({
         </section>
       )}
 
-      <footer className="border-t border-zinc-800 pt-4 text-xs text-zinc-500">
-        Data:{" "}
-        <a className="underline" href="https://www.mtgo.com/calendar.ics">
-          mtgo.com/calendar.ics
-        </a>
-        . Not affiliated with Wizards of the Coast or Daybreak Games. ·{" "}
-        <Link href="/privacy" className="underline hover:text-zinc-300">
-          Privacy
-        </Link>
-      </footer>
+      <SiteFooter />
 
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
       />
     </main>
   );

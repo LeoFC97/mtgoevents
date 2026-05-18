@@ -1,5 +1,7 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import AdUnit from "@/components/ad-unit";
+import SiteFooter from "@/components/site-footer";
 import CalendarView from "./calendar-view";
 import {
   eventStructuredData,
@@ -13,6 +15,10 @@ export const revalidate = 900;
 
 const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL?.trim() ?? "https://mtgoevents.com";
+
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+};
 
 export default async function Home() {
   let events: MtgoEvent[] = [];
@@ -31,19 +37,41 @@ export default async function Home() {
   );
   const visibleFormats = KNOWN_FORMATS.filter((f) => upcomingFormats.has(f));
 
-  const itemListSchema = {
+  const upcoming = events.filter((e) => new Date(e.endUtc).getTime() >= now);
+
+  const graph = {
     "@context": "https://schema.org",
-    "@type": "ItemList",
-    name: "Upcoming MTGO events",
-    numberOfItems: events.length,
-    itemListElement: events
-      .filter((e) => new Date(e.endUtc).getTime() >= now)
-      .slice(0, 25)
-      .map((ev, i) => ({
-        "@type": "ListItem",
-        position: i + 1,
-        item: eventStructuredData(ev, siteUrl),
-      })),
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": `${siteUrl}/#website`,
+        url: siteUrl,
+        name: "MTGO Events",
+        description:
+          "Weekly calendar of Magic Online scheduled events with one-click Google Calendar export and .ics subscription.",
+        publisher: { "@id": `${siteUrl}/#organization` },
+      },
+      {
+        "@type": "Organization",
+        "@id": `${siteUrl}/#organization`,
+        name: "MTGO Events",
+        url: siteUrl,
+        logo: {
+          "@type": "ImageObject",
+          url: `${siteUrl}/icon.svg`,
+        },
+      },
+      {
+        "@type": "ItemList",
+        name: "Upcoming MTGO events",
+        numberOfItems: upcoming.length,
+        itemListElement: upcoming.slice(0, 25).map((ev, i) => ({
+          "@type": "ListItem",
+          position: i + 1,
+          item: eventStructuredData(ev, siteUrl),
+        })),
+      },
+    ],
   };
 
   return (
@@ -54,7 +82,7 @@ export default async function Home() {
         </h1>
         <p className="text-sm text-zinc-400">
           Weekly calendar of Magic Online scheduled events. Click any event to
-          add it to your Google Calendar.
+          add it to your Google Calendar, or subscribe to a filtered .ics feed.
         </p>
       </header>
 
@@ -93,22 +121,11 @@ export default async function Home() {
         slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_FOOTER}
         className="min-h-[90px]"
       />
-      <footer className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-zinc-800 pt-4 text-xs text-zinc-500">
-        <span>
-          Data:{" "}
-          <a className="underline" href="https://www.mtgo.com/calendar.ics">
-            mtgo.com/calendar.ics
-          </a>
-          . Not affiliated with Wizards of the Coast or Daybreak Games.
-        </span>
-        <Link href="/privacy" className="underline hover:text-zinc-300">
-          Privacy
-        </Link>
-      </footer>
+      <SiteFooter />
 
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListSchema) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(graph) }}
       />
     </main>
   );

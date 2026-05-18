@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import SiteFooter from "@/components/site-footer";
 import {
+  breadcrumbStructuredData,
   bucketOf,
   eventStructuredData,
   FORMAT_DESCRIPTIONS,
@@ -99,6 +101,11 @@ export default async function FormatPage({
     })),
   };
 
+  const breadcrumbSchema = breadcrumbStructuredData([
+    { name: "MTGO Events", url: siteUrl },
+    { name: format, url: `${siteUrl}/format/${slug}` },
+  ]);
+
   const otherFormats = KNOWN_FORMATS.filter((f) => f !== format);
 
   return (
@@ -157,9 +164,12 @@ export default async function FormatPage({
                   >
                     {ev.type}
                   </Link>
-                  <span className="text-xs tabular-nums text-zinc-400">
+                  <time
+                    dateTime={ev.startUtc}
+                    className="text-xs tabular-nums text-zinc-400"
+                  >
                     {formatDateTime(ev.startUtc)}
-                  </span>
+                  </time>
                 </div>
                 <span className="rounded-full border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-[10px] uppercase tracking-wide text-zinc-400">
                   {bucketOf(ev.type)}
@@ -196,20 +206,15 @@ export default async function FormatPage({
         </ul>
       </section>
 
-      <footer className="border-t border-zinc-800 pt-4 text-xs text-zinc-500">
-        Data:{" "}
-        <a className="underline" href="https://www.mtgo.com/calendar.ics">
-          mtgo.com/calendar.ics
-        </a>
-        . Not affiliated with Wizards of the Coast or Daybreak Games. ·{" "}
-        <Link href="/privacy" className="underline hover:text-zinc-300">
-          Privacy
-        </Link>
-      </footer>
+      <SiteFooter />
 
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
       />
     </main>
   );

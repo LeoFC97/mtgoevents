@@ -1,9 +1,11 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import SiteFooter from "@/components/site-footer";
 
 export const metadata: Metadata = {
   title: "Privacy Policy — MTGO Events",
   description: "How MTGO Events handles data and cookies.",
+  alternates: { canonical: "/privacy" },
 };
 
 export default function PrivacyPage() {
@@ -84,11 +86,12 @@ export default function PrivacyPage() {
         </p>
       </section>
 
-      <footer className="border-t border-zinc-800 pt-4 text-xs text-zinc-500">
+      <p className="text-sm">
         <Link href="/" className="underline hover:text-zinc-300">
           ← Back to calendar
         </Link>
-      </footer>
+      </p>
+      <SiteFooter />
     </main>
   );
 }

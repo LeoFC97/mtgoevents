@@ -169,10 +169,12 @@ export function eventStructuredData(
   event: MtgoEvent,
   siteUrl: string
 ): Record<string, unknown> {
+  const description = `${event.summary} on Magic Online — scheduled event from the official MTGO calendar.`;
   return {
     "@context": "https://schema.org",
     "@type": "Event",
     name: event.summary,
+    description,
     startDate: event.startUtc,
     endDate: event.endUtc,
     eventStatus: "https://schema.org/EventScheduled",
@@ -186,7 +188,26 @@ export function eventStructuredData(
       name: "Daybreak Games",
       url: "https://www.mtgo.com/",
     },
+    image: [`${siteUrl}/opengraph-image`],
     url: `${siteUrl}/event/${event.uid}`,
+  };
+}
+
+export function breadcrumbStructuredData(
+  trail: Array<{ name: string; url?: string }>
+): Record<string, unknown> {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: trail.map((c, i) => {
+      const node: Record<string, unknown> = {
+        "@type": "ListItem",
+        position: i + 1,
+        name: c.name,
+      };
+      if (c.url) node.item = c.url;
+      return node;
+    }),
   };
 }
 
