@@ -6,8 +6,10 @@ import "./globals.css";
 const adsenseClient = process.env.NEXT_PUBLIC_ADSENSE_CLIENT;
 const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL?.trim() ?? "https://mtgoevents.vercel.app";
+const defaultTitle =
+  "MTGO Events — Magic Online Schedule, Challenges & Qualifiers";
 const description =
-  "Weekly calendar of Magic Online scheduled events. Subscribe by .ics or add any event to Google Calendar in one click.";
+  "Free weekly calendar of every Magic Online scheduled event — Challenges, Qualifiers, Preliminaries. Add to Google Calendar or subscribe via .ics.";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -22,7 +24,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "MTGO Events — Magic Online weekly schedule",
+    default: defaultTitle,
     template: "%s — MTGO Events",
   },
   description,
@@ -33,10 +35,14 @@ export const metadata: Metadata = {
     "Magic the Gathering",
     "MTG schedule",
     "MTGO calendar",
+    "MTGO schedule",
+    "MTGO events",
     "Modern",
     "Legacy",
     "Pauper",
     "Standard",
+    "Pioneer",
+    "Vintage",
     "Challenge",
     "Qualifier",
   ],
@@ -44,13 +50,13 @@ export const metadata: Metadata = {
     type: "website",
     url: siteUrl,
     siteName: "MTGO Events",
-    title: "MTGO Events — Magic Online weekly schedule",
+    title: defaultTitle,
     description,
     locale: "en_US",
   },
   twitter: {
     card: "summary_large_image",
-    title: "MTGO Events — Magic Online weekly schedule",
+    title: defaultTitle,
     description,
   },
   robots: {
