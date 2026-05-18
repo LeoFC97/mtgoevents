@@ -56,6 +56,34 @@ function startOfWeekKey(key: string): string {
   return addDaysKey(key, -dowOfKey(key));
 }
 
+function addMonthsKey(key: string, n: number): string {
+  const [y, m, d] = key.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1 + n, 1, 12));
+  const lastDay = new Date(
+    Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth() + 1, 0)
+  ).getUTCDate();
+  const day = Math.min(d, lastDay);
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function monthGridKeys(anchorKey: string): string[] {
+  const [y, m] = anchorKey.split("-").map(Number);
+  const firstOfMonth = `${y}-${String(m).padStart(2, "0")}-01`;
+  const lastDayNum = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const lastOfMonth = `${y}-${String(m).padStart(2, "0")}-${String(lastDayNum).padStart(2, "0")}`;
+  const gridStart = startOfWeekKey(firstOfMonth);
+  const gridEnd = addDaysKey(startOfWeekKey(lastOfMonth), 6);
+  const result: string[] = [];
+  let cur = gridStart;
+  while (cur <= gridEnd) {
+    result.push(cur);
+    cur = addDaysKey(cur, 1);
+  }
+  return result;
+}
+
+type CalendarView = "week" | "month";
+
 function formatDayLabel(key: string, opts: Intl.DateTimeFormatOptions): string {
   const [y, m, d] = key.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString("en-US", {
@@ -78,7 +106,10 @@ function getAllTimezones(): string[] {
 export default function CalendarView({ events }: { events: MtgoEvent[] }) {
   const [tz, setTz] = useState<string>(DEFAULT_TZ);
   const [autoTz, setAutoTz] = useState<string>(DEFAULT_TZ);
-  const [weekOffset, setWeekOffset] = useState<number>(0);
+  const [view, setView] = useState<CalendarView>("week");
+  const [anchorKey, setAnchorKey] = useState<string>(() =>
+    dayKeyInTz(new Date(), DEFAULT_TZ)
+  );
   const [formatFilter, setFormatFilter] = useState<Set<string>>(new Set());
   const [typeFilter, setTypeFilter] = useState<Set<TypeBucket>>(new Set());
 
@@ -86,6 +117,7 @@ export default function CalendarView({ events }: { events: MtgoEvent[] }) {
     const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     setAutoTz(browserTz);
     setTz(browserTz);
+    setAnchorKey(dayKeyInTz(new Date(), browserTz));
 
     const params = new URLSearchParams(window.location.search);
     const fromUrl = (key: string) =>
@@ -93,16 +125,17 @@ export default function CalendarView({ events }: { events: MtgoEvent[] }) {
     const fmt = fromUrl("formats");
     const typ = fromUrl("types");
     if (fmt.length) setFormatFilter(new Set(fmt));
-    if (typ.length)
-      setTypeFilter(new Set(typ as TypeBucket[]));
+    if (typ.length) setTypeFilter(new Set(typ as TypeBucket[]));
+    if (params.get("view") === "month") setView("month");
   }, []);
 
   const filterQuery = useMemo(() => {
     const params = new URLSearchParams();
     if (formatFilter.size) params.set("formats", [...formatFilter].join(","));
     if (typeFilter.size) params.set("types", [...typeFilter].join(","));
+    if (view === "month") params.set("view", "month");
     return params.toString();
-  }, [formatFilter, typeFilter]);
+  }, [formatFilter, typeFilter, view]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -118,15 +151,21 @@ export default function CalendarView({ events }: { events: MtgoEvent[] }) {
 
   const todayKey = useMemo(() => dayKeyInTz(new Date(), tz), [tz]);
 
-  const weekStartKey = useMemo(
-    () => addDaysKey(startOfWeekKey(todayKey), weekOffset * 7),
-    [todayKey, weekOffset]
-  );
+  const dayKeys = useMemo(() => {
+    if (view === "month") return monthGridKeys(anchorKey);
+    const start = startOfWeekKey(anchorKey);
+    return Array.from({ length: 7 }, (_, i) => addDaysKey(start, i));
+  }, [anchorKey, view]);
 
-  const dayKeys = useMemo(
-    () => Array.from({ length: 7 }, (_, i) => addDaysKey(weekStartKey, i)),
-    [weekStartKey]
-  );
+  const handlePrev = () => {
+    if (view === "week") setAnchorKey(addDaysKey(anchorKey, -7));
+    else setAnchorKey(addMonthsKey(anchorKey, -1));
+  };
+  const handleNext = () => {
+    if (view === "week") setAnchorKey(addDaysKey(anchorKey, 7));
+    else setAnchorKey(addMonthsKey(anchorKey, 1));
+  };
+  const handleToday = () => setAnchorKey(todayKey);
 
   const availableFormats = useMemo(() => {
     const present = new Set(events.map((e) => e.format));
@@ -160,38 +199,45 @@ export default function CalendarView({ events }: { events: MtgoEvent[] }) {
     setter(next);
   };
 
-  const rangeLabel = `${formatDayLabel(dayKeys[0], {
-    month: "short",
-    day: "numeric",
-  })} – ${formatDayLabel(dayKeys[6], {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  })}`;
+  const rangeLabel =
+    view === "month"
+      ? formatDayLabel(`${anchorKey.slice(0, 7)}-15`, {
+          month: "long",
+          year: "numeric",
+        })
+      : `${formatDayLabel(dayKeys[0], {
+          month: "short",
+          day: "numeric",
+        })} – ${formatDayLabel(dayKeys[6], {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })}`;
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <ViewToggle view={view} onChange={setView} />
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => setWeekOffset(weekOffset - 1)}
-            aria-label="Previous week"
+            onClick={handlePrev}
+            aria-label={view === "week" ? "Previous week" : "Previous month"}
             className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm hover:bg-zinc-800"
           >
             ← <span className="hidden sm:inline">Prev</span>
           </button>
           <button
             type="button"
-            onClick={() => setWeekOffset(0)}
+            onClick={handleToday}
             className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm hover:bg-zinc-800"
           >
             Today
           </button>
           <button
             type="button"
-            onClick={() => setWeekOffset(weekOffset + 1)}
-            aria-label="Next week"
+            onClick={handleNext}
+            aria-label={view === "week" ? "Next week" : "Next month"}
             className="rounded-md border border-zinc-700 px-3 py-1.5 text-sm hover:bg-zinc-800"
           >
             <span className="hidden sm:inline">Next</span> →
@@ -227,35 +273,147 @@ export default function CalendarView({ events }: { events: MtgoEvent[] }) {
 
       <SubscribeSection filterQuery={filterQuery} isFiltered={filterQuery.length > 0} />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7">
+      {view === "week" ? (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7">
+          {dayKeys.map((key, i) => {
+            const isToday = key === todayKey;
+            return (
+              <div
+                key={key}
+                className={`flex min-h-32 flex-col rounded-lg border ${
+                  isToday
+                    ? "border-emerald-500/50 bg-emerald-500/5"
+                    : "border-zinc-800 bg-zinc-900/40"
+                }`}
+              >
+                <div className="border-b border-zinc-800 px-3 py-2">
+                  <div className="flex items-baseline justify-between gap-2 xl:block">
+                    <div className="text-xs uppercase tracking-wide text-zinc-400">
+                      {DAY_NAMES[dowOfKey(key)]}
+                    </div>
+                    <div className="text-sm font-medium">
+                      {formatDayLabel(key, { month: "short", day: "numeric" })}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-2 p-2">
+                  {byDay[i].length === 0 ? (
+                    <div className="px-1 py-2 text-xs text-zinc-500">
+                      No events
+                    </div>
+                  ) : (
+                    byDay[i].map((ev) => (
+                      <EventCard key={ev.uid} event={ev} tz={tz} />
+                    ))
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <MonthGrid
+          dayKeys={dayKeys}
+          byDay={byDay}
+          anchorKey={anchorKey}
+          todayKey={todayKey}
+          tz={tz}
+        />
+      )}
+    </div>
+  );
+}
+
+function ViewToggle({
+  view,
+  onChange,
+}: {
+  view: CalendarView;
+  onChange: (v: CalendarView) => void;
+}) {
+  const base =
+    "rounded-md px-3 py-1.5 text-sm transition border";
+  const on = "border-emerald-500 bg-emerald-500/20 text-emerald-200";
+  const off = "border-zinc-700 bg-zinc-900 text-zinc-300 hover:bg-zinc-800";
+  return (
+    <div className="inline-flex items-center gap-1 rounded-md p-0.5">
+      <button
+        type="button"
+        onClick={() => onChange("week")}
+        className={`${base} ${view === "week" ? on : off}`}
+      >
+        Week
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange("month")}
+        className={`${base} ${view === "month" ? on : off}`}
+      >
+        Month
+      </button>
+    </div>
+  );
+}
+
+function MonthGrid({
+  dayKeys,
+  byDay,
+  anchorKey,
+  todayKey,
+  tz,
+}: {
+  dayKeys: string[];
+  byDay: MtgoEvent[][];
+  anchorKey: string;
+  todayKey: string;
+  tz: string;
+}) {
+  const monthPrefix = anchorKey.slice(0, 7);
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="hidden grid-cols-7 gap-1 text-center text-[10px] uppercase tracking-wide text-zinc-500 sm:grid">
+        {DAY_NAMES.map((n) => (
+          <div key={n}>{n}</div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-1">
         {dayKeys.map((key, i) => {
           const isToday = key === todayKey;
+          const inMonth = key.slice(0, 7) === monthPrefix;
+          const events = byDay[i];
           return (
             <div
               key={key}
-              className={`flex min-h-32 flex-col rounded-lg border ${
+              className={`flex min-h-20 flex-col rounded-md border p-1 sm:min-h-28 ${
                 isToday
                   ? "border-emerald-500/50 bg-emerald-500/5"
-                  : "border-zinc-800 bg-zinc-900/40"
+                  : inMonth
+                    ? "border-zinc-800 bg-zinc-900/40"
+                    : "border-zinc-900 bg-zinc-950/40"
               }`}
             >
-              <div className="border-b border-zinc-800 px-3 py-2">
-                <div className="flex items-baseline justify-between gap-2 xl:block">
-                  <div className="text-xs uppercase tracking-wide text-zinc-400">
-                    {DAY_NAMES[dowOfKey(key)]}
-                  </div>
-                  <div className="text-sm font-medium">
-                    {formatDayLabel(key, { month: "short", day: "numeric" })}
-                  </div>
-                </div>
+              <div
+                className={`mb-1 flex items-center justify-between text-[10px] ${
+                  inMonth ? "text-zinc-300" : "text-zinc-600"
+                }`}
+              >
+                <span className="sm:hidden">{DAY_NAMES[dowOfKey(key)][0]}</span>
+                <span
+                  className={`tabular-nums ${
+                    isToday ? "font-bold text-emerald-300" : "font-medium"
+                  }`}
+                >
+                  {key.slice(8)}
+                </span>
               </div>
-              <div className="flex flex-col gap-2 p-2">
-                {byDay[i].length === 0 ? (
-                  <div className="px-1 py-2 text-xs text-zinc-500">No events</div>
-                ) : (
-                  byDay[i].map((ev) => (
-                    <EventCard key={ev.uid} event={ev} tz={tz} />
-                  ))
+              <div className="flex flex-col gap-0.5 overflow-hidden">
+                {events.slice(0, 4).map((ev) => (
+                  <EventChip key={ev.uid} event={ev} tz={tz} />
+                ))}
+                {events.length > 4 && (
+                  <span className="text-[10px] text-zinc-500">
+                    +{events.length - 4} more
+                  </span>
                 )}
               </div>
             </div>
@@ -263,6 +421,28 @@ export default function CalendarView({ events }: { events: MtgoEvent[] }) {
         })}
       </div>
     </div>
+  );
+}
+
+function EventChip({ event, tz }: { event: MtgoEvent; tz: string }) {
+  const start = new Date(event.startUtc);
+  const timeLabel = start.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: tz,
+  });
+  const formatClass = FORMAT_COLORS[event.format] ?? defaultFormatColor();
+  return (
+    <a
+      href={googleCalendarUrl(event)}
+      target="_blank"
+      rel="noreferrer"
+      title={`${event.format} ${event.type} — ${timeLabel}`}
+      className={`flex items-center gap-1 truncate rounded border px-1 py-0.5 text-[10px] leading-tight ${formatClass} hover:brightness-125`}
+    >
+      <span className="shrink-0 tabular-nums">{timeLabel}</span>
+      <span className="truncate">{event.type}</span>
+    </a>
   );
 }
 
