@@ -55,8 +55,12 @@ function dowOfKey(key: string): number {
   return new Date(Date.UTC(y, m - 1, d, 12)).getUTCDay();
 }
 
-function startOfWeekKey(key: string): string {
-  return addDaysKey(key, -dowOfKey(key));
+function startOfWeekKey(key: string, weekStartsOn: WeekStart = 0): string {
+  const dow = dowOfKey(key);
+  if (weekStartsOn === 0) return addDaysKey(key, -dow);
+  // Monday start: dow 1 -> 0, dow 0 (Sun) -> 6
+  const offset = (dow - weekStartsOn + 7) % 7;
+  return addDaysKey(key, -offset);
 }
 
 function addMonthsKey(key: string, n: number): string {
@@ -69,13 +73,13 @@ function addMonthsKey(key: string, n: number): string {
   return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-function monthGridKeys(anchorKey: string): string[] {
+function monthGridKeys(anchorKey: string, weekStartsOn: WeekStart): string[] {
   const [y, m] = anchorKey.split("-").map(Number);
   const firstOfMonth = `${y}-${String(m).padStart(2, "0")}-01`;
   const lastDayNum = new Date(Date.UTC(y, m, 0)).getUTCDate();
   const lastOfMonth = `${y}-${String(m).padStart(2, "0")}-${String(lastDayNum).padStart(2, "0")}`;
-  const gridStart = startOfWeekKey(firstOfMonth);
-  const gridEnd = addDaysKey(startOfWeekKey(lastOfMonth), 6);
+  const gridStart = startOfWeekKey(firstOfMonth, weekStartsOn);
+  const gridEnd = addDaysKey(startOfWeekKey(lastOfMonth, weekStartsOn), 6);
   const result: string[] = [];
   let cur = gridStart;
   while (cur <= gridEnd) {
@@ -86,6 +90,7 @@ function monthGridKeys(anchorKey: string): string[] {
 }
 
 type CalendarView = "week" | "month";
+type WeekStart = 0 | 1; // 0 = Sunday, 1 = Monday
 
 function formatDayLabel(key: string, opts: Intl.DateTimeFormatOptions): string {
   const [y, m, d] = key.split("-").map(Number);
@@ -110,6 +115,7 @@ export default function CalendarView({ events }: { events: MtgoEvent[] }) {
   const [tz, setTz] = useState<string>(DEFAULT_TZ);
   const [autoTz, setAutoTz] = useState<string>(DEFAULT_TZ);
   const [view, setView] = useState<CalendarView>("week");
+  const [weekStartsOn, setWeekStartsOn] = useState<WeekStart>(1);
   const [anchorKey, setAnchorKey] = useState<string>(() =>
     dayKeyInTz(new Date(), DEFAULT_TZ)
   );
@@ -133,7 +139,24 @@ export default function CalendarView({ events }: { events: MtgoEvent[] }) {
     if (typ.length) setTypeFilter(new Set(typ as TypeBucket[]));
     if (src.length) setSourceFilter(new Set(src as EventSource[]));
     if (params.get("view") === "month") setView("month");
+
+    const urlWeekStart = params.get("weekStart");
+    const stored =
+      urlWeekStart ??
+      (typeof window !== "undefined"
+        ? window.localStorage.getItem("weekStartsOn")
+        : null);
+    if (stored === "sun" || stored === "0") setWeekStartsOn(0);
+    else if (stored === "mon" || stored === "1") setWeekStartsOn(1);
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      "weekStartsOn",
+      weekStartsOn === 0 ? "sun" : "mon"
+    );
+  }, [weekStartsOn]);
 
   const filterQuery = useMemo(() => {
     const params = new URLSearchParams();
@@ -141,8 +164,9 @@ export default function CalendarView({ events }: { events: MtgoEvent[] }) {
     if (typeFilter.size) params.set("types", [...typeFilter].join(","));
     if (sourceFilter.size) params.set("source", [...sourceFilter].join(","));
     if (view === "month") params.set("view", "month");
+    if (weekStartsOn === 0) params.set("weekStart", "sun");
     return params.toString();
-  }, [formatFilter, typeFilter, sourceFilter, view]);
+  }, [formatFilter, typeFilter, sourceFilter, view, weekStartsOn]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -159,10 +183,10 @@ export default function CalendarView({ events }: { events: MtgoEvent[] }) {
   const todayKey = useMemo(() => dayKeyInTz(new Date(), tz), [tz]);
 
   const dayKeys = useMemo(() => {
-    if (view === "month") return monthGridKeys(anchorKey);
-    const start = startOfWeekKey(anchorKey);
+    if (view === "month") return monthGridKeys(anchorKey, weekStartsOn);
+    const start = startOfWeekKey(anchorKey, weekStartsOn);
     return Array.from({ length: 7 }, (_, i) => addDaysKey(start, i));
-  }, [anchorKey, view]);
+  }, [anchorKey, view, weekStartsOn]);
 
   const handlePrev = () => {
     if (view === "week") setAnchorKey(addDaysKey(anchorKey, -7));
@@ -252,6 +276,10 @@ export default function CalendarView({ events }: { events: MtgoEvent[] }) {
           </button>
         </div>
         <div className="text-base font-medium sm:text-lg">{rangeLabel}</div>
+        <WeekStartToggle
+          weekStartsOn={weekStartsOn}
+          onChange={setWeekStartsOn}
+        />
         <TimezonePicker
           tz={tz}
           autoTz={autoTz}
@@ -336,6 +364,7 @@ export default function CalendarView({ events }: { events: MtgoEvent[] }) {
           anchorKey={anchorKey}
           todayKey={todayKey}
           tz={tz}
+          weekStartsOn={weekStartsOn}
         />
       )}
     </div>
@@ -373,24 +402,66 @@ function ViewToggle({
   );
 }
 
+function WeekStartToggle({
+  weekStartsOn,
+  onChange,
+}: {
+  weekStartsOn: WeekStart;
+  onChange: (v: WeekStart) => void;
+}) {
+  const base = "rounded-md px-2.5 py-1 text-xs transition border";
+  const on = "border-emerald-500 bg-emerald-500/20 text-emerald-200";
+  const off = "border-zinc-700 bg-zinc-900 text-zinc-300 hover:bg-zinc-800";
+  return (
+    <div
+      className="inline-flex items-center gap-1"
+      title="Week starts on"
+    >
+      <span className="text-[10px] uppercase tracking-wide text-zinc-500">
+        Starts
+      </span>
+      <button
+        type="button"
+        onClick={() => onChange(1)}
+        className={`${base} ${weekStartsOn === 1 ? on : off}`}
+      >
+        Mon
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange(0)}
+        className={`${base} ${weekStartsOn === 0 ? on : off}`}
+      >
+        Sun
+      </button>
+    </div>
+  );
+}
+
 function MonthGrid({
   dayKeys,
   byDay,
   anchorKey,
   todayKey,
   tz,
+  weekStartsOn,
 }: {
   dayKeys: string[];
   byDay: MtgoEvent[][];
   anchorKey: string;
   todayKey: string;
   tz: string;
+  weekStartsOn: WeekStart;
 }) {
   const monthPrefix = anchorKey.slice(0, 7);
+  const orderedDayNames = Array.from(
+    { length: 7 },
+    (_, i) => DAY_NAMES[(i + weekStartsOn) % 7]
+  );
   return (
     <div className="flex flex-col gap-2">
       <div className="hidden grid-cols-7 gap-1 text-center text-[10px] uppercase tracking-wide text-zinc-500 sm:grid">
-        {DAY_NAMES.map((n) => (
+        {orderedDayNames.map((n) => (
           <div key={n}>{n}</div>
         ))}
       </div>
