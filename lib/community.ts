@@ -47,8 +47,8 @@ export const ORGANIZERS: Organizer[] = [
       "Brazilian Pauper content creator hosting weekly Fuguete Champ tournaments on MTGO. Free entry, Top 10 wins Play Points, streamed live every Monday on Twitch and YouTube.",
     links: {
       twitch: "https://www.twitch.tv/tiagofuguete",
-      youtube: "https://www.youtube.com/@tiagofuguete",
-      signupBase: "https://mtg.cardsrealm.com/pt-br/profile/tiagofuguete",
+      youtube: "https://www.youtube.com/c/TiagoFuguete",
+      signupBase: "https://cardsrealm.com/en-us/profile/tiago1690",
     },
     color: "#ec4899",
     initials: "TF",
@@ -68,10 +68,10 @@ export const RECURRING_EVENTS: RecurringEventTemplate[] = [
     entryFee: "FREE",
     prizes: "Top 10 win Play Points",
     rounds: "5 Swiss Rounds",
-    signupUrl: "https://mtg.cardsrealm.com/pt-br/profile/tiagofuguete",
+    signupUrl: "https://cardsrealm.com/en-us/profile/tiago1690",
     streamUrls: {
       twitch: "https://www.twitch.tv/tiagofuguete",
-      youtube: "https://www.youtube.com/@tiagofuguete/live",
+      youtube: "https://www.youtube.com/c/TiagoFuguete/live",
     },
     frequency: "weekly",
     dayOfWeek: 1,
