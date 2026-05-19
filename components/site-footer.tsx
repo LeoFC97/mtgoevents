@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { formatToSlug, KNOWN_FORMATS } from "@/lib/events";
+import { ORGANIZERS } from "@/lib/community";
 
 export default function SiteFooter() {
   return (
@@ -21,6 +22,25 @@ export default function SiteFooter() {
           ))}
         </ul>
       </div>
+      {ORGANIZERS.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <span className="text-[10px] uppercase tracking-wide text-zinc-500">
+            Community hosts
+          </span>
+          <ul className="flex flex-wrap gap-x-3 gap-y-1">
+            {ORGANIZERS.map((o) => (
+              <li key={o.slug}>
+                <Link
+                  href={`/community/${o.slug}`}
+                  className="hover:text-zinc-300 hover:underline"
+                >
+                  {o.name}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <span>
           Data:{" "}

@@ -1,3 +1,5 @@
+export type EventSource = "mtgo" | "community";
+
 export type MtgoEvent = {
   uid: string;
   summary: string;
@@ -5,6 +7,10 @@ export type MtgoEvent = {
   type: string;
   startUtc: string;
   endUtc: string;
+  source: EventSource;
+  organizerSlug?: string;
+  signupUrl?: string;
+  streamUrls?: { twitch?: string; youtube?: string };
 };
 
 const FORMATS = [
@@ -86,6 +92,7 @@ export function parseIcs(ics: string): MtgoEvent[] {
       type,
       startUtc: parseIcsDate(dtStart),
       endUtc: parseIcsDate(dtEnd),
+      source: "mtgo",
     });
   }
   return events.sort((a, b) => a.startUtc.localeCompare(b.startUtc));
@@ -97,7 +104,14 @@ export async function fetchEvents(): Promise<MtgoEvent[]> {
   });
   if (!res.ok) throw new Error(`MTGO feed responded ${res.status}`);
   const text = await res.text();
-  return parseIcs(text);
+  const mtgo = parseIcs(text);
+  // Lazy import to avoid pulling community data into route handlers that
+  // don't render it
+  const { getAllCommunityEvents } = await import("./community");
+  const community = getAllCommunityEvents();
+  return [...mtgo, ...community].sort((a, b) =>
+    a.startUtc.localeCompare(b.startUtc)
+  );
 }
 
 function pad(n: number): string {

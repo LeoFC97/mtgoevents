@@ -10,6 +10,7 @@ import {
   KNOWN_FORMATS,
   type MtgoEvent,
 } from "@/lib/events";
+import { ORGANIZERS } from "@/lib/community";
 
 export const revalidate = 900;
 
@@ -101,6 +102,32 @@ export default async function Home() {
               className="rounded-full border border-zinc-700 bg-zinc-900 px-3 py-1 text-xs text-zinc-300 hover:border-zinc-500 hover:text-zinc-100"
             >
               {f}
+            </Link>
+          ))}
+        </nav>
+      )}
+
+      {ORGANIZERS.length > 0 && (
+        <nav
+          aria-label="Community organizers"
+          className="flex flex-wrap items-center gap-2"
+        >
+          <span className="text-xs uppercase tracking-wide text-zinc-500">
+            Community hosts
+          </span>
+          {ORGANIZERS.map((o) => (
+            <Link
+              key={o.slug}
+              href={`/community/${o.slug}`}
+              className="flex items-center gap-2 rounded-full border border-zinc-700 bg-zinc-900 px-3 py-1 text-xs text-zinc-300 hover:border-zinc-500 hover:text-zinc-100"
+            >
+              <span
+                className="flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-bold text-white"
+                style={{ backgroundColor: o.color }}
+              >
+                {o.initials}
+              </span>
+              {o.name}
             </Link>
           ))}
         </nav>

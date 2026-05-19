@@ -1,14 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   bucketOf,
   googleCalendarUrl,
   KNOWN_FORMATS,
   TYPE_BUCKETS,
+  type EventSource,
   type MtgoEvent,
   type TypeBucket,
 } from "@/lib/events";
+import { findOrganizer } from "@/lib/community";
 
 const FORMAT_COLORS: Record<string, string> = {
   Modern: "bg-purple-500/15 text-purple-300 border-purple-500/40",
@@ -112,6 +115,7 @@ export default function CalendarView({ events }: { events: MtgoEvent[] }) {
   );
   const [formatFilter, setFormatFilter] = useState<Set<string>>(new Set());
   const [typeFilter, setTypeFilter] = useState<Set<TypeBucket>>(new Set());
+  const [sourceFilter, setSourceFilter] = useState<Set<EventSource>>(new Set());
 
   useEffect(() => {
     const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -124,8 +128,10 @@ export default function CalendarView({ events }: { events: MtgoEvent[] }) {
       (params.get(key) ?? "").split(",").map((s) => s.trim()).filter(Boolean);
     const fmt = fromUrl("formats");
     const typ = fromUrl("types");
+    const src = fromUrl("source");
     if (fmt.length) setFormatFilter(new Set(fmt));
     if (typ.length) setTypeFilter(new Set(typ as TypeBucket[]));
+    if (src.length) setSourceFilter(new Set(src as EventSource[]));
     if (params.get("view") === "month") setView("month");
   }, []);
 
@@ -133,9 +139,10 @@ export default function CalendarView({ events }: { events: MtgoEvent[] }) {
     const params = new URLSearchParams();
     if (formatFilter.size) params.set("formats", [...formatFilter].join(","));
     if (typeFilter.size) params.set("types", [...typeFilter].join(","));
+    if (sourceFilter.size) params.set("source", [...sourceFilter].join(","));
     if (view === "month") params.set("view", "month");
     return params.toString();
-  }, [formatFilter, typeFilter, view]);
+  }, [formatFilter, typeFilter, sourceFilter, view]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -176,11 +183,12 @@ export default function CalendarView({ events }: { events: MtgoEvent[] }) {
     const now = Date.now();
     return events.filter((ev) => {
       if (new Date(ev.endUtc).getTime() < now) return false;
+      if (sourceFilter.size && !sourceFilter.has(ev.source)) return false;
       if (formatFilter.size && !formatFilter.has(ev.format)) return false;
       if (typeFilter.size && !typeFilter.has(bucketOf(ev.type))) return false;
       return true;
     });
-  }, [events, formatFilter, typeFilter]);
+  }, [events, formatFilter, typeFilter, sourceFilter]);
 
   const byDay = useMemo(() => {
     const buckets: Record<string, MtgoEvent[]> = {};
@@ -253,6 +261,16 @@ export default function CalendarView({ events }: { events: MtgoEvent[] }) {
       </div>
 
       <div className="flex flex-col gap-3">
+        <FilterRow
+          label="Source"
+          items={["mtgo", "community"] as EventSource[]}
+          labels={{ mtgo: "Official", community: "Community" }}
+          active={sourceFilter}
+          onToggle={(v) =>
+            toggle(sourceFilter, v as EventSource, setSourceFilter)
+          }
+          onClear={() => setSourceFilter(new Set())}
+        />
         <FilterRow
           label="Format"
           items={availableFormats}
@@ -489,12 +507,14 @@ function TimezonePicker({
 function FilterRow<T extends string>({
   label,
   items,
+  labels,
   active,
   onToggle,
   onClear,
 }: {
   label: string;
   items: T[];
+  labels?: Partial<Record<T, string>>;
   active: Set<T>;
   onToggle: (v: T) => void;
   onClear: () => void;
@@ -517,7 +537,7 @@ function FilterRow<T extends string>({
                 : "border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-zinc-500"
             }`}
           >
-            {item}
+            {labels?.[item] ?? item}
           </button>
         );
       })}
@@ -542,9 +562,21 @@ function EventCard({ event, tz }: { event: MtgoEvent; tz: string }) {
     timeZone: tz,
   });
   const formatClass = FORMAT_COLORS[event.format] ?? defaultFormatColor();
+  const organizer =
+    event.source === "community" && event.organizerSlug
+      ? findOrganizer(event.organizerSlug)
+      : null;
+  const watchUrl =
+    event.streamUrls?.twitch ?? event.streamUrls?.youtube ?? null;
 
   return (
-    <div className="flex flex-col gap-1 rounded-md border border-zinc-800 bg-zinc-950/60 p-2 hover:border-zinc-700">
+    <div
+      className="flex flex-col gap-1 rounded-md border bg-zinc-950/60 p-2 hover:brightness-110"
+      style={{
+        borderColor: organizer ? organizer.color + "66" : undefined,
+        borderLeftWidth: organizer ? "3px" : undefined,
+      }}
+    >
       <div className="flex items-center gap-2">
         <span
           className={`rounded-sm border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${formatClass}`}
@@ -554,16 +586,48 @@ function EventCard({ event, tz }: { event: MtgoEvent; tz: string }) {
         <span className="text-[11px] tabular-nums text-zinc-400">
           {timeLabel}
         </span>
+        {organizer && (
+          <Link
+            href={`/community/${organizer.slug}`}
+            title={organizer.name}
+            style={{ backgroundColor: organizer.color }}
+            className="ml-auto flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-bold text-white hover:scale-110"
+          >
+            {organizer.initials}
+          </Link>
+        )}
       </div>
       <div className="text-sm leading-snug">{event.type}</div>
-      <a
-        href={googleCalendarUrl(event)}
-        target="_blank"
-        rel="noreferrer"
-        className="mt-1 inline-flex items-center justify-center gap-1 rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200 hover:border-emerald-500 hover:text-emerald-300"
-      >
-        + Google Calendar
-      </a>
+      <div className="mt-1 flex flex-wrap gap-1">
+        {event.signupUrl && (
+          <a
+            href={event.signupUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex flex-1 items-center justify-center gap-1 rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200 hover:border-emerald-500 hover:text-emerald-300"
+          >
+            Sign up ↗
+          </a>
+        )}
+        {watchUrl && (
+          <a
+            href={watchUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex flex-1 items-center justify-center gap-1 rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200 hover:border-rose-500 hover:text-rose-300"
+          >
+            Watch ↗
+          </a>
+        )}
+        <a
+          href={googleCalendarUrl(event)}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex flex-1 items-center justify-center gap-1 rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200 hover:border-emerald-500 hover:text-emerald-300"
+        >
+          + Calendar
+        </a>
+      </div>
     </div>
   );
 }

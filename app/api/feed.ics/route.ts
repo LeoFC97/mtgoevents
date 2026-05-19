@@ -51,6 +51,11 @@ export async function GET(req: Request) {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+  const sources = (url.searchParams.get("source") ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const organizer = url.searchParams.get("organizer")?.trim() ?? "";
 
   let events;
   try {
@@ -63,10 +68,13 @@ export async function GET(req: Request) {
   const filtered = events.filter((ev) => {
     if (formats.length && !formats.includes(ev.format)) return false;
     if (types.length && !types.includes(bucketOf(ev.type))) return false;
+    if (sources.length && !sources.includes(ev.source)) return false;
+    if (organizer && ev.organizerSlug !== organizer) return false;
     return true;
   });
 
-  const isFiltered = formats.length > 0 || types.length > 0;
+  const isFiltered =
+    formats.length > 0 || types.length > 0 || sources.length > 0 || !!organizer;
   const calName = isFiltered ? "MTGO Events (filtered)" : "MTGO Events";
   const dtstamp = toIcsDate(new Date().toISOString());
 

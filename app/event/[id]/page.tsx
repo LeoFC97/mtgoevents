@@ -11,6 +11,7 @@ import {
   formatToSlug,
   googleCalendarUrl,
 } from "@/lib/events";
+import { findOrganizer } from "@/lib/community";
 
 export const revalidate = 900;
 export const dynamicParams = true;
@@ -84,16 +85,33 @@ export default async function EventPage({
   const event = await findEvent(id);
   if (!event) notFound();
 
+  const organizer =
+    event.source === "community" && event.organizerSlug
+      ? findOrganizer(event.organizerSlug)
+      : null;
   const schema = eventStructuredData(event, siteUrl);
-  const breadcrumbSchema = breadcrumbStructuredData([
-    { name: "MTGO Events", url: siteUrl },
-    {
-      name: event.format,
-      url: `${siteUrl}/format/${formatToSlug(event.format)}`,
-    },
-    { name: event.summary },
-  ]);
+  const breadcrumbSchema = breadcrumbStructuredData(
+    organizer
+      ? [
+          { name: "MTGO Events", url: siteUrl },
+          {
+            name: organizer.name,
+            url: `${siteUrl}/community/${organizer.slug}`,
+          },
+          { name: event.summary },
+        ]
+      : [
+          { name: "MTGO Events", url: siteUrl },
+          {
+            name: event.format,
+            url: `${siteUrl}/format/${formatToSlug(event.format)}`,
+          },
+          { name: event.summary },
+        ]
+  );
   const isPast = new Date(event.endUtc).getTime() < Date.now();
+  const watchUrl =
+    event.streamUrls?.twitch ?? event.streamUrls?.youtube ?? null;
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
@@ -143,8 +161,53 @@ export default async function EventPage({
         </div>
       </section>
 
+      {organizer && (
+        <section className="flex flex-col gap-3 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
+          <div className="flex items-center gap-3">
+            <div
+              className="flex h-12 w-12 items-center justify-center rounded-xl text-base font-bold text-white"
+              style={{ backgroundColor: organizer.color }}
+            >
+              {organizer.initials}
+            </div>
+            <div className="flex flex-col">
+              <span className="text-xs uppercase tracking-wide text-zinc-500">
+                Hosted by
+              </span>
+              <Link
+                href={`/community/${organizer.slug}`}
+                className="text-base font-medium text-zinc-100 hover:text-emerald-300 hover:underline"
+              >
+                {organizer.name}
+              </Link>
+            </div>
+          </div>
+          <p className="text-sm text-zinc-300">{organizer.description}</p>
+        </section>
+      )}
+
       {!isPast && (
         <section className="flex flex-wrap gap-2">
+          {event.signupUrl && (
+            <a
+              href={event.signupUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-100 hover:border-emerald-500 hover:text-emerald-300"
+            >
+              Sign up ↗
+            </a>
+          )}
+          {watchUrl && (
+            <a
+              href={watchUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-100 hover:border-rose-500 hover:text-rose-300"
+            >
+              Watch live ↗
+            </a>
+          )}
           <a
             href={googleCalendarUrl(event)}
             target="_blank"
@@ -153,18 +216,29 @@ export default async function EventPage({
           >
             + Google Calendar
           </a>
-          <a
-            href={`/api/feed.ics?formats=${encodeURIComponent(event.format)}`}
-            className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-100 hover:border-emerald-500 hover:text-emerald-300"
-          >
-            Subscribe to {event.format} feed
-          </a>
-          <Link
-            href={`/format/${formatToSlug(event.format)}`}
-            className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-100 hover:border-emerald-500 hover:text-emerald-300"
-          >
-            More {event.format} events
-          </Link>
+          {organizer ? (
+            <Link
+              href={`/community/${organizer.slug}`}
+              className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-100 hover:border-emerald-500 hover:text-emerald-300"
+            >
+              More from {organizer.name}
+            </Link>
+          ) : (
+            <>
+              <a
+                href={`/api/feed.ics?formats=${encodeURIComponent(event.format)}`}
+                className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-100 hover:border-emerald-500 hover:text-emerald-300"
+              >
+                Subscribe to {event.format} feed
+              </a>
+              <Link
+                href={`/format/${formatToSlug(event.format)}`}
+                className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-100 hover:border-emerald-500 hover:text-emerald-300"
+              >
+                More {event.format} events
+              </Link>
+            </>
+          )}
         </section>
       )}
 

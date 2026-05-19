@@ -5,6 +5,7 @@ import {
   KNOWN_FORMATS,
   type MtgoEvent,
 } from "@/lib/events";
+import { ORGANIZERS } from "@/lib/community";
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL?.trim() ?? "https://mtgoevents.com";
@@ -35,6 +36,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }));
 
+  const communityPages: MetadataRoute.Sitemap = ORGANIZERS.map((o) => ({
+    url: `${SITE_URL}/community/${o.slug}`,
+    lastModified: now,
+    changeFrequency: "weekly" as const,
+    priority: 0.7,
+  }));
+
   let events: MtgoEvent[] = [];
   try {
     events = await fetchEvents();
@@ -52,5 +60,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.5,
   }));
 
-  return [...base, ...formatPages, ...eventPages];
+  return [...base, ...formatPages, ...communityPages, ...eventPages];
 }
